@@ -1,12 +1,25 @@
 #include "mbed.h"
 #include "msg.h"
+#include "controller.h"
 
 DigitalOut en(PC_10);
 
 DigitalOut led(LED1);
 
+AnalogIn xRaw(PC_2);
+AnalogIn yRaw(PC_3);
+
 Serial pc(SERIAL_TX, SERIAL_RX);
 Serial bt(PA_15, PB_7);
+
+Ticker temp;
+
+enum Role {
+    MASTER,
+    SLAVE,
+    MSG
+};
+Role role;
 
 // 컨트롤러 포트 설정 필요.
 
@@ -27,7 +40,7 @@ void pcOut()
 }
 
 void pcIn()
-{
+{   
     char input[100];
     msgIn(&bt, input);
     
@@ -64,8 +77,13 @@ void pcIn()
     // 기타.
     else
     {
-        pc.printf("msg in: %s\n", input);
+        pc.printf("%s\n", input);
     }
+}
+
+void ctrlOut()
+{
+    sendCtrl(&xRaw, &yRaw, &bt);
 }
 
 int main()
@@ -74,13 +92,25 @@ int main()
     
     // 전역 변수 초기화.
     en = 0;
+    role = MASTER;
     
     // 환경 초기화.
     init();
     
     // 실행 코드.
-    pc.attach(&pcOut);
-    bt.attach(&pcIn);
+    switch(role)
+    {
+        case MASTER:
+            pc.attach(&ctrlOut);
+            break;
+        case SLAVE:
+            bt.attach(&pcIn);
+            break;
+        case MSG:
+            pc.attach(&pcOut);
+            bt.attach(&pcIn);
+            break;
+    }
         
     return 0; 
 }
