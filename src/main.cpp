@@ -1,116 +1,154 @@
+// 기관명: 한국기술교육대학교
+// 교과목: 마이크로프로세서및실습
+// 프로젝트: 로봇 축구
+// 소속: 미정
+// 구성원: 김성녕 | 임재경 | 임창민 | 조경우
+
+// 메인 함수: 환경 초기화, 주요 포트 및 로직 정의.
+// 의존성: msg.h, cmd.h
+
 #include "mbed.h"
 #include "msg.h"
-#include "controller.h"
+#include "cmd.h"
+#include "ctrl.h"
+#include "mtr.h"
 
+#define MAX_MSG_LEN 40
+
+// 명령 모드 설정, 0: 통신, 1: 명령.
 DigitalOut en(PC_10);
-
-DigitalOut led(LED1);
-
-AnalogIn xRaw(PC_2);
-AnalogIn yRaw(PC_3);
 
 Serial pc(SERIAL_TX, SERIAL_RX);
 Serial bt(PA_15, PB_7);
 
-Ticker temp;
+AnalogIn x_raw(PC_2);
+AnalogIn y_raw(PC_3);
 
-enum Role {
+Ticker ticker_ctrl_out;
+
+// 해당 모듈이 수행하는 역할:
+// MASTER: 컨트롤러.
+// SLAVE: 모터 구동.
+// MSG: 메시지 모드.
+// CMD: 블루투스 모듈 설정.
+enum Mode {
     MASTER,
     SLAVE,
-    MSG
+    MSG,
+    CMD
 };
-Role role;
+Mode mode;
 
-// 컨트롤러 포트 설정 필요.
+void init(Mode mode_);
 
-// 전역 변수를 통한 환경 초기화.
-void init()
-{
-    pc.baud(9600);
-    bt.baud(9600);
-}
+void ctrl_out();
+void ctrl_in();
 
-void pcOut()
-{
-    char str[100];
-    getString(&pc, str, 100);
-    msgOut(&pc, &bt, str);
-    
-    // 컨트롤러 신호 전송 로직 필요.
-}
+void msg_in();
+void msg_out();
 
-void pcIn()
-{   
-    char input[100];
-    msgIn(&bt, input);
-    
-    // led 제어 구문.
-    if (!strcmp(input, "ledOn"))
-    {
-        pc.printf("cmd in: ledOn\n");
-        led = 1;
-    }
-    else if (!strcmp(input, "ledOff"))
-    {
-        pc.printf("cmd in: ledOff\n");
-        led = 0;
-    }
-    
-    // 모터 제어 구문.
-    else if (!strcmp(input, "moveF"))
-    {
-        pc.printf("moveFoward: not yet implemented.\n");
-    }
-    else if (!strcmp(input, "moveB"))
-    {
-        pc.printf("moveBackward: not yet implemented.\n");
-    }
-    else if (!strcmp(input, "turnL"))
-    {
-        pc.printf("turnLeft: not yet implemented.\n");
-    }
-    else if (!strcmp(input, "turnR"))
-    {
-        pc.printf("moveRight: not yet implemented.\n");
-    }
-    
-    // 기타.
-    else
-    {
-        pc.printf("%s\n", input);
-    }
-}
-
-void ctrlOut()
-{
-    sendCtrl(&xRaw, &yRaw, &bt);
-}
+void cmd_in();
+void cmd_out();
 
 int main()
 {
-    pc.printf("start\n");
+    init(SLAVE);
     
-    // 전역 변수 초기화.
-    en = 0;
-    role = MASTER;
-    
-    // 환경 초기화.
-    init();
-    
-    // 실행 코드.
-    switch(role)
+    pc.printf("Initial Configuration Completed. ");
+    switch(mode)
     {
         case MASTER:
-            pc.attach(&ctrlOut);
+            pc.printf("[MASTER]\n");
             break;
         case SLAVE:
-            bt.attach(&pcIn);
+            pc.printf("[SLAVE]\n");
             break;
         case MSG:
-            pc.attach(&pcOut);
-            bt.attach(&pcIn);
+            pc.printf("[MSG]\n");
             break;
+        case CMD:
+            pc.printf("[CMD]\n");
+            break;
+    }
+    
+    switch(mode)
+    {
+        case MASTER:
+            ticker_ctrl_out.attach(&ctrl_out, 0.05);
+            break;
+        case SLAVE:
+            bt.attach(&ctrl_in);
+            break;
+        case MSG:
+            pc.attach(&msg_out);
+            bt.attach(&msg_in);
+            break;
+        case CMD:
+            pc.attach(&cmd_out);
+            bt.attach(&cmd_in);
     }
         
     return 0; 
+}
+
+void init(Mode mode_)
+{
+    en = mode_ == CMD;
+    mode = mode_;
+    
+    if (en)
+    {
+        pc.baud(9600);
+        bt.baud(9600);
+    }
+    else
+    {
+        pc.baud(9600);
+        bt.baud(9600);
+    }
+}
+
+void ctrl_debug(int x, int y)
+{
+    pc.printf("CTRL IN: %d %d\n", x, y);
+}
+
+void ctrl_out()
+{
+    ctrl::out(&x_raw, &y_raw, &bt);
+}
+
+void ctrl_in()
+{
+    int x, y;
+    ctrl::in(&bt, &x, &y);
+    ctrl_debug(x, y);
+}
+
+void msg_in()
+{   
+    char input[MAX_MSG_LEN];
+    msg::in(&bt, input);
+    pc.printf("MSG IN: %s\n", input);
+}
+
+void msg_out()
+{
+    char output[MAX_MSG_LEN];
+    msg::get_string(&pc, output);
+    pc.printf("MSG OUT: %s\n", output);
+    msg::out(&bt, output);
+}
+
+void cmd_in()
+{
+    cmd::in(&bt, &pc);
+}
+
+void cmd_out()
+{
+    char output[MAX_MSG_LEN];
+    msg::get_string(&pc, output);
+    pc.printf("CMD OUT: %s\n", output);
+    cmd::out(&pc, &bt, output);
 }
