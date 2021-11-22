@@ -18,12 +18,24 @@
 // 명령 모드 설정, 0: 통신, 1: 명령.
 DigitalOut en(PC_10);
 
+// 시리얼 통신.
 Serial pc(SERIAL_TX, SERIAL_RX);
 Serial bt(PA_15, PB_7);
 
+// 조이스틱.
 AnalogIn x_raw(PC_2);
 AnalogIn y_raw(PC_3);
 
+// 스테핑 모터.
+DigitalOut motor_en(PA_4);
+
+PwmOut left(PA_0);
+DigitalOut left_rotate(PC_2);
+
+PwmOut right(PA_1);
+DigitalOut right_rotate(PC_3);
+
+// 기타.
 Ticker ticker_ctrl_out;
 
 // 해당 모듈이 수행하는 역할:
@@ -74,10 +86,11 @@ int main()
     switch(mode)
     {
         case MASTER:
-            ticker_ctrl_out.attach(&ctrl_out, 0.05);
+            ticker_ctrl_out.attach(&ctrl_out, 0.1);
             break;
         case SLAVE:
             bt.attach(&ctrl_in);
+            //ctrl_in();
             break;
         case MSG:
             pc.attach(&msg_out);
@@ -115,7 +128,7 @@ void ctrl_debug(int x, int y)
 
 void ctrl_out()
 {
-    ctrl::out(&x_raw, &y_raw, &bt);
+    ctrl::out(&x_raw, &y_raw, &bt, &pc);
 }
 
 void ctrl_in()
@@ -123,6 +136,16 @@ void ctrl_in()
     int x, y;
     ctrl::in(&bt, &x, &y);
     ctrl_debug(x, y);
+
+    pc.printf("MOTOR SETUP\n");
+    
+    // 회전 우선.
+    if (!(120 <= x && x <= 140))
+        mtr::turn(&motor_en, &left, &left_rotate, &right, &right_rotate, x);
+    else
+        mtr::move(&motor_en, &left, &left_rotate, &right, &right_rotate, y);
+    
+    pc.printf("MOTOR DONE\n");
 }
 
 void msg_in()
