@@ -58,9 +58,9 @@ namespace mtr
         }
         
         left->write(level);
-        left->period_ms(10);
+        left->period_ms(1);
         right->write(level);
-        right->period_ms(10);
+        right->period_ms(1);
     }
     
     int get_turn_dir(int raw_dir)
@@ -91,9 +91,9 @@ namespace mtr
         }
         
         left->write(0.5);
-        left->period_ms(10);
+        left->period_ms(5);
         right->write(0.5);
-        right->period_ms(10);
+        right->period_ms(5);
     }
 }
     

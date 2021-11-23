@@ -16,6 +16,7 @@
 #define MAX_MSG_LEN 40
 
 // 명령 모드 설정, 0: 통신, 1: 명령.
+// 소프트웨적 제어 불가능, 하드웨어적으로 제어해야 함.
 DigitalOut en(PC_10);
 
 // 시리얼 통신.
@@ -90,7 +91,6 @@ int main()
             break;
         case SLAVE:
             bt.attach(&ctrl_in);
-            //ctrl_in();
             break;
         case MSG:
             pc.attach(&msg_out);
@@ -111,11 +111,13 @@ void init(Mode mode_)
     
     if (en)
     {
-        pc.baud(9600);
-        bt.baud(9600);
+		pc.printf("[Baud Rate: 38400]\n");
+        pc.baud(38400);
+        bt.baud(38400);
     }
     else
     {
+		pc.printf("[Baud Rate: 9600]\n");
         pc.baud(9600);
         bt.baud(9600);
     }
